@@ -30,34 +30,35 @@ final class StaffController extends Controller
         $invitedUser->assignRole($request->validated('role'));
 
         return response()->json([
-            'message' => 'Staff invitation sent successfully.',
-            'data' => $staff,
-        ], 201);
-    }
-
-    public function accept(Request $request, StoreStaff $staff): JsonResponse
-    {
-        if (! $request->hasValidSignature()) {
-            return response()->json(['message' => 'Invalid or expired signature.'], 401);
+                'message' => 'Staff invitation sent successfully.',
+                'data' => $staff,
+            ], 201);
         }
 
-        $acceptedStaff = $this->service->accept($staff, (string) $request->query('token'));
+        public function accept(Request $request, StoreStaff $staff): JsonResponse
+        {
+            if (! $request->hasValidSignature()) {
+                return response()->json(['message' => 'Invalid or expired signature.'], 401);
+            }
 
-        return response()->json([
-            'message' => 'Invitation accepted successfully.',
-            'data' => $acceptedStaff,
-        ]);
+            $acceptedStaff = $this->service->accept($staff, (string) $request->query('token'));
+
+            return response()->json([
+                'message' => 'Invitation accepted successfully.',
+                'data' => $acceptedStaff,
+            ]);
+        }
+
+        public function revoke(Request $request, StoreStaff $staff): JsonResponse
+        {
+            $this->authorize('revoke', $staff);
+
+            $revokedStaff = $this->service->revoke($staff);
+
+            return response()->json([
+                'message' => 'Staff membership revoked.',
+                'data' => $revokedStaff,
+            ]);
+        }
     }
-
-    public function revoke(Request $request, StoreStaff $staff): JsonResponse
-    {
-        $this->authorize('revoke', $staff);
-
-        $revokedStaff = $this->service->revoke($staff);
-
-        return response()->json([
-            'message' => 'Staff membership revoked.',
-            'data' => $revokedStaff,
-        ]);
-    }
-}
+?>

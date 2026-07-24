@@ -17,7 +17,7 @@ return new class extends Migration
             $table->ulid('id')->primary();
  
             $table->foreignUlid('application_id')->constrained('merchant_applications')->cascadeOnDelete();
-            $table->foreignId('reviewer_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUlid('reviewer_id')->constrained('users')->cascadeOnDelete();
  
             $table->string('action'); // approve | reject | request_info
             $table->text('notes')->nullable();

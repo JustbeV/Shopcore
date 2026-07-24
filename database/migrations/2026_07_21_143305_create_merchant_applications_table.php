@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('merchant_applications', function (Blueprint $table) {
             $table->ulid('id')->primary();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('business_name');
             $table->string('business_type');
             $table->json('metadata')->nullable();

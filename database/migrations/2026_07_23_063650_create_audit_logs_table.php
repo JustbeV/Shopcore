@@ -19,7 +19,7 @@ return new class extends Migration
             // Nullable: some audit entries originate from system/queue
             // actions with no acting user (e.g. an automated
             // subscription downgrade), not just admin/merchant actions.
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUlid('user_id')->nullable()->constrained('users')->nullOnDelete();
  
             $table->string('action');
  

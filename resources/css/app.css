@@ -1,9 +1,23 @@
-@import 'tailwindcss';
+import '../css/app.css';
+import { createRoot } from 'react-dom/client';
+import { createInertiaApp } from '@inertiajs/react';
+import type { ComponentType } from 'react';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+createInertiaApp({
+  resolve: (name) => {
+    const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true }) as Record<
+      string,
+      { default: ComponentType }
+    >;
+    const page = pages[`./Pages/${name}.tsx`];
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-}
+    if (!page) {
+      throw new Error(`Page not found: ./Pages/${name}.tsx`);
+    }
+
+    return page.default;
+  },
+  setup({ el, App, props }) {
+    createRoot(el).render(<App {...props} />);
+  },
+});

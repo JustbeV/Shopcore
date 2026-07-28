@@ -13,33 +13,33 @@ interface Props {
   product?: Product; // present when editing, absent when creating
 }
 
-/**
- * One form component for both create and edit — the API endpoints
- * differ (POST vs PUT) but the fields and validation shape are
- * identical, and duplicating this component would just mean two
- * places to keep in sync with StoreProductRequest/UpdateProductRequest.
- */
 export default function ProductForm({ storeId, categories, product }: Props) {
   const isEditing = product !== undefined;
 
-  const { data, setData, post, put, processing, errors } = useForm({
+  // 1. Destructure `transform` from useForm
+  const { data, setData, post, put, transform, processing, errors } = useForm({
     title: product?.title ?? '',
     slug: product?.slug ?? '',
     description: product?.description ?? '',
     base_price_cents: product ? product.base_price_cents / 100 : 0,
     currency: product?.currency ?? 'USD',
-    category_ids: product?.categories.map((c) => c.id) ?? ([] as string[]),
+    category_ids: product?.categories?.map((c) => c.id) ?? ([] as string[]),
   });
+
+  // 2. Register the transformation (converts price to cents before sending)
+  transform((formData) => ({
+    ...formData,
+    base_price_cents: Math.round(Number(formData.base_price_cents) * 100),
+  }));
 
   function submit(e: FormEvent) {
     e.preventDefault();
 
-    const payload = { ...data, base_price_cents: Math.round(Number(data.base_price_cents) * 100) };
-
+    // 3. Call put/post with ONLY the URL (Inertia handles the payload automatically)
     if (isEditing) {
-      put(`/api/v1/tenant/stores/${storeId}/products/${product.id}`, { data: payload });
+      put(`/api/v1/tenant/stores/${storeId}/products/${product.id}`);
     } else {
-      post(`/api/v1/tenant/stores/${storeId}/products`, { data: payload });
+      post(`/api/v1/tenant/stores/${storeId}/products`);
     }
   }
 

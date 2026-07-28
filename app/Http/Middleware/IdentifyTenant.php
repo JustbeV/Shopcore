@@ -50,6 +50,15 @@ final class IdentifyTenant
             abort(404, 'Store not found.');
         }
 
+        // ------------------------------------------------------------------
+        // Publish Gate Enforcement
+        // ------------------------------------------------------------------
+        // If the store is draft/unpublished, block public storefront access.
+        // (Optionally allow logged-in store owners/staff to preview via an auth check here)
+        if (! $store->is_published) {
+            abort(404, 'Store not found.'); // Or render a custom 'Store Opening Soon' view
+        }
+
         $this->context->set($store);
 
         return $next($request);

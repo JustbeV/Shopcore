@@ -9,27 +9,38 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Catalog\Models\ProductVariant;
 
-class CartItem extends Model
+class OrderItem extends Model
 {
     use HasFactory, HasUlids;
 
-    // Note: CartItem is intentionally NOT BelongsToTenant. It has no store_id
-    // column of its own — it's scoped transitively through its parent Cart,
-    // which is the tenant-owned entity. Always query cart items via
-    // $cart->items(), never CartItem::query() directly.
+    // Not BelongsToTenant — scoped transitively through its parent Order,
+    // same rationale as CartItem.
 
     protected $fillable = [
-        'cart_id',
+        'order_id',
         'variant_id',
+        'product_title_snapshot',
+        'sku_snapshot',
+        'options_snapshot',
         'quantity',
         'unit_price_cents',
+        'total_cents',
     ];
 
-    public function cart(): BelongsTo
+    protected $casts = [
+        'options_snapshot' => 'array',
+    ];
+
+    public function order(): BelongsTo
     {
-        return $this->belongsTo(Cart::class);
+        return $this->belongsTo(Order::class);
     }
 
+    /**
+     * May return null if the variant was later deleted — always prefer the
+     * *_snapshot columns for display; only use this relation for things like
+     * "go back to this product" links, and null-check accordingly.
+     */
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
@@ -37,11 +48,6 @@ class CartItem extends Model
 
     public function unitPrice(): Money
     {
-        return Money::fromMinorUnits($this->unit_price_cents, $this->cart->currency);
-    }
-
-    public function lineTotal(): Money
-    {
-        return $this->unitPrice()->multiply($this->quantity);
+        return Money::fromMinorUnits($this->unit_price_cents, $this->order->currency);
     }
 }

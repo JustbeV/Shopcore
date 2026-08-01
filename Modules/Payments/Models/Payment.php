@@ -19,6 +19,7 @@ class Payment extends Model
         'provider',
         'status',
         'provider_reference',
+        'client_secret',
         'amount_cents',
         'currency',
         'failure_reason',

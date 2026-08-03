@@ -44,6 +44,16 @@ class Customer extends Model implements AuthenticatableContract
         return $this->hasMany(Order::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function wishlist(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
     public function cart(): HasOne
     {
         return $this->hasOne(Cart::class);

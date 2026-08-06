@@ -2,8 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\CRM\Http\Controllers\Api\AuthController;
+use Modules\CRM\Http\Controllers\Api\Merchant\ReviewController as MerchantReviewController;
 use Modules\CRM\Http\Controllers\Api\PasswordResetController;
 use Modules\CRM\Http\Controllers\Api\ProfileController;
+use Modules\CRM\Http\Controllers\Api\Storefront\ReviewController;
+use Modules\CRM\Http\Controllers\Api\Storefront\WishlistController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,4 +33,25 @@ Route::middleware('auth:customer')->prefix('store/account/profile')->group(funct
     Route::get('/', [ProfileController::class, 'show'])->name('store.account.profile.show');
     Route::put('/', [ProfileController::class, 'update'])->name('store.account.profile.update');
     Route::put('password', [ProfileController::class, 'updatePassword'])->name('store.account.profile.password');
+});
+
+// --- Storefront: Reviews (public read, customer-only write) ---
+Route::get('store/products/{productId}/reviews', [ReviewController::class, 'index'])
+    ->name('store.products.reviews.index');
+Route::post('store/products/{productId}/reviews', [ReviewController::class, 'store'])
+    ->middleware('auth:customer')
+    ->name('store.products.reviews.store');
+
+// --- Storefront: Wishlist (customer-only) ---
+Route::middleware('auth:customer')->prefix('store/wishlist')->group(function () {
+    Route::get('/', [WishlistController::class, 'index'])->name('store.wishlist.index');
+    Route::post('{productId}', [WishlistController::class, 'store'])->name('store.wishlist.store');
+    Route::delete('{productId}', [WishlistController::class, 'destroy'])->name('store.wishlist.destroy');
+});
+
+// --- Merchant: review moderation ---
+Route::middleware('auth:sanctum')->prefix('merchant/reviews')->group(function () {
+    Route::get('/', [MerchantReviewController::class, 'index'])->name('merchant.reviews.index');
+    Route::post('{reviewId}/approve', [MerchantReviewController::class, 'approve'])->name('merchant.reviews.approve');
+    Route::post('{reviewId}/reject', [MerchantReviewController::class, 'reject'])->name('merchant.reviews.reject');
 });

@@ -63,4 +63,20 @@ class InventoryService
                 'updated_at' => now(),
             ]);
     }
+
+    /**
+     * Reverses commit() — called when an approved refund puts stock back on
+     * the shelf. Deliberately does NOT touch quantity_reserved (there's
+     * nothing reserved for a paid, already-committed order).
+     */
+    public function restock(string $storeId, string $variantId, int $quantity): void
+    {
+        DB::table('inventory_items')
+            ->where('store_id', $storeId)
+            ->where('variant_id', $variantId)
+            ->update([
+                'quantity_on_hand' => DB::raw('quantity_on_hand + '.(int) $quantity),
+                'updated_at' => now(),
+            ]);
+    }
 }

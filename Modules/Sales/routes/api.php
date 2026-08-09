@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Modules\Sales\Http\Controllers\Api\CartController;
 use Modules\Sales\Http\Controllers\Api\CheckoutController;
 use Modules\Sales\Http\Controllers\Api\Merchant\OrderController as MerchantOrderController;
+use Modules\Sales\Http\Controllers\Api\Merchant\RefundController as MerchantRefundController;
+use Modules\Sales\Http\Controllers\Api\RefundController;
 use Modules\Sales\Http\Controllers\Api\Storefront\AccountOrderController;
 
 /*
@@ -45,4 +47,16 @@ Route::middleware('auth:sanctum')->prefix('merchant/orders')->group(function () 
     Route::get('/', [MerchantOrderController::class, 'index'])->name('merchant.orders.index');
     Route::get('{orderId}', [MerchantOrderController::class, 'show'])->name('merchant.orders.show');
     Route::post('{orderId}/fulfill', [MerchantOrderController::class, 'fulfill'])->name('merchant.orders.fulfill');
+});
+
+// --- Storefront: refund requests (authenticated customers only) ---
+Route::post('store/orders/{orderId}/refund-request', [RefundController::class, 'store'])
+    ->middleware('auth:customer')
+    ->name('store.orders.refund-request');
+
+// --- Merchant: refund decisions ---
+Route::middleware('auth:sanctum')->prefix('merchant/refunds')->group(function () {
+    Route::get('/', [MerchantRefundController::class, 'index'])->name('merchant.refunds.index');
+    Route::post('{refundId}/approve', [MerchantRefundController::class, 'approve'])->name('merchant.refunds.approve');
+    Route::post('{refundId}/reject', [MerchantRefundController::class, 'reject'])->name('merchant.refunds.reject');
 });

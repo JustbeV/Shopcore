@@ -28,4 +28,14 @@ class OrderPolicy
             && $order->store_id === app(\App\Support\Tenancy\TenantContext::class)->store->id
             && in_array($order->status, ['paid', 'processing'], strict: true);
     }
+
+    private const REFUND_WINDOW_DAYS = 30;
+
+    public function request(\Modules\CRM\Models\Customer $customer, Order $order): bool
+    {
+        return $order->customer_id === $customer->id
+            && in_array($order->status, ['paid', 'processing', 'shipped', 'delivered'], strict: true)
+            && $order->placed_at !== null
+            && $order->placed_at->greaterThan(now()->subDays(self::REFUND_WINDOW_DAYS));
+    }
 }

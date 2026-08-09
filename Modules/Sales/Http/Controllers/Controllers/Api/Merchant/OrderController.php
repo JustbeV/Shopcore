@@ -39,9 +39,7 @@ class OrderController extends Controller
     public function fulfill(FulfillOrderRequest $request, string $orderId)
     {
         $order = Order::query()->findOrFail($orderId);
-
-        // Authorization already ran in FulfillOrderRequest::authorize(),
-        // which checks the same 'fulfill' policy ability against this order.
+        $this->authorize('fulfill', $order);
 
         $shipment = Shipment::query()->updateOrCreate(
             ['order_id' => $order->id],

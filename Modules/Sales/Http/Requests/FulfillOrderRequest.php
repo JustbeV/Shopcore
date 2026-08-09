@@ -8,7 +8,11 @@ class FulfillOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('fulfill', $this->route('order'));
+        // See RequestRefundRequest for why this can't check the policy here:
+        // $this->route('order') is a raw ID string, not a bound Order model.
+        // OrderController::fulfill() calls $this->authorize('fulfill', $order)
+        // itself after loading the model.
+        return true;
     }
 
     public function rules(): array

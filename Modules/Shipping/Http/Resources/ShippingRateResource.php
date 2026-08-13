@@ -20,4 +20,4 @@ class ShippingRateResource extends JsonResource
             'is_active' => $this->is_active,
         ];
     }
-}
+}   

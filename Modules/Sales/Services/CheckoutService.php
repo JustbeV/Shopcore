@@ -16,6 +16,7 @@ use Modules\Sales\Exceptions\CheckoutException;
 use Modules\Sales\Exceptions\OutOfStockException;
 use Modules\Sales\Models\Cart;
 use Modules\Sales\Models\Order;
+use Modules\Shipping\Services\ShippingService;
 use Modules\Tenant\Models\Store;
 
 class CheckoutService
@@ -23,6 +24,8 @@ class CheckoutService
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly InventoryService $inventory,
+        private readonly CouponService $coupons,
+        private readonly ShippingService $shipping,
         private readonly PaymentGatewayInterface $gateway,
     ) {}
 
@@ -38,6 +41,8 @@ class CheckoutService
         array $shippingAddress,
         array $billingAddress,
         ?string $idempotencyKey = null,
+        ?string $couponCode = null,
+        ?string $shippingRateId = null,
     ): array {
         // Checked BEFORE the empty-cart guard below: a retried request after
         // the first attempt already succeeded (and cleared the cart) must
@@ -67,7 +72,7 @@ class CheckoutService
         // ANY line is out of stock, the whole transaction rolls back and
         // every reservation made so far in this attempt rolls back with it —
         // no manual compensation needed for this part.
-        [$order, $payment] = DB::transaction(function () use ($cart, $customer, $shippingAddress, $billingAddress, $idempotencyKey) {
+        [$order, $payment, $coupon] = DB::transaction(function () use ($cart, $customer, $shippingAddress, $billingAddress, $idempotencyKey, $couponCode, $shippingRateId) {
             $storeId = $this->tenant->store->id;
             $subtotal = Money::zero($cart->currency);
 
@@ -108,13 +113,56 @@ class CheckoutService
                 $subtotal = $subtotal->add($lineTotal);
             }
 
-            // Tax/shipping intentionally zero — Shipping module (rates) and
-            // tax calculation aren't built yet (Phase 6+). Order schema
-            // already has the columns so wiring them in later doesn't
-            // require a migration.
+            // --- Shipping: optional. A rate must belong to this store and
+            // match the shipping country — re-validated here (not trusted
+            // from the request) same as everything else in this method.
+            $shippingCost = Money::zero($cart->currency);
+            $shippingRateName = null;
+
+            if ($shippingRateId) {
+                $rate = $this->shipping->findValidRate($shippingRateId, $shippingAddress['country']);
+
+                if (! $rate) {
+                    throw new CheckoutException('INVALID_SHIPPING_RATE', 'The selected shipping option is no longer available.');
+                }
+
+                $shippingCost = Money::fromMinorUnits($rate->price_cents, $cart->currency);
+                $shippingRateName = $rate->name;
+            }
+
+            // --- Coupon: optional, atomically redeemed here so a limited
+            // coupon can't be over-redeemed by concurrent checkouts (same
+            // pattern as inventory reservation above).
+            $discount = Money::zero($cart->currency);
+            $coupon = null;
+
+            if ($couponCode) {
+                $coupon = $this->coupons->findValid($storeId, $couponCode);
+                $this->coupons->redeem($coupon); // throws CheckoutException if limit hit
+
+                if ($coupon->type === 'free_shipping') {
+                    $discount = Money::zero($cart->currency); // subtotal untouched
+                    $shippingCost = Money::zero($cart->currency); // this is the actual discount
+                } else {
+                    $discount = $coupon->calculateDiscount($subtotal);
+                }
+            }
+
+            $total = $subtotal->add($shippingCost); // tax still 0, see note below
+            $total = Money::fromMinorUnits(max($total->amountMinor() - $discount->amountMinor(), 0), $cart->currency);
+
+            // Tax intentionally zero — no tax engine yet. Shipping and
+            // coupons ARE wired in now; the schema already had the columns
+            // waiting for this.
             $order->update([
                 'subtotal_cents' => $subtotal->amountMinor(),
-                'total_cents' => $subtotal->amountMinor(),
+                'shipping_cents' => $shippingCost->amountMinor(),
+                'shipping_rate_id' => $shippingRateId,
+                'shipping_rate_name_snapshot' => $shippingRateName,
+                'discount_cents' => $discount->amountMinor(),
+                'coupon_id' => $coupon?->id,
+                'coupon_code_snapshot' => $coupon?->code,
+                'total_cents' => $total->amountMinor(),
                 'placed_at' => now(),
             ]);
 
@@ -125,7 +173,7 @@ class CheckoutService
                 'currency' => $order->currency,
             ]);
 
-            return [$order, $payment];
+            return [$order, $payment, $coupon];
         });
 
         // --- Step 2: the external call, deliberately OUTSIDE the DB
@@ -138,7 +186,7 @@ class CheckoutService
             );
         } catch (\Throwable $e) {
             Log::error('Payment gateway createIntent failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            $this->compensateFailedInitiation($order);
+            $this->compensateFailedInitiation($order, $coupon);
 
             throw new CheckoutException('PAYMENT_GATEWAY_ERROR', 'Could not start payment. Please try again.');
         }
@@ -223,19 +271,30 @@ class CheckoutService
                         $this->inventory->release($store->id, $item->variant_id, $item->quantity);
                     }
                 }
+
+                if ($order->coupon_id) {
+                    $coupon = \Modules\Sales\Models\Coupon::query()->find($order->coupon_id);
+                    if ($coupon) {
+                        $this->coupons->release($coupon);
+                    }
+                }
             });
         });
     }
 
-    private function compensateFailedInitiation(Order $order): void
+    private function compensateFailedInitiation(Order $order, ?\Modules\Sales\Models\Coupon $coupon): void
     {
-        DB::transaction(function () use ($order) {
+        DB::transaction(function () use ($order, $coupon) {
             $storeId = $order->store_id;
 
             foreach ($order->items as $item) {
                 if ($item->variant?->track_inventory) {
                     $this->inventory->release($storeId, $item->variant_id, $item->quantity);
                 }
+            }
+
+            if ($coupon) {
+                $this->coupons->release($coupon);
             }
 
             $order->transitionTo('cancelled', note: 'Payment gateway error during checkout');

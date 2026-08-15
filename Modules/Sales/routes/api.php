@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Sales\Http\Controllers\Api\CartController;
 use Modules\Sales\Http\Controllers\Api\CheckoutController;
+use Modules\Sales\Http\Controllers\Api\Merchant\CouponController as MerchantCouponController;
 use Modules\Sales\Http\Controllers\Api\Merchant\OrderController as MerchantOrderController;
 use Modules\Sales\Http\Controllers\Api\Merchant\RefundController as MerchantRefundController;
 use Modules\Sales\Http\Controllers\Api\RefundController;
@@ -59,4 +60,12 @@ Route::middleware('auth:sanctum')->prefix('merchant/refunds')->group(function ()
     Route::get('/', [MerchantRefundController::class, 'index'])->name('merchant.refunds.index');
     Route::post('{refundId}/approve', [MerchantRefundController::class, 'approve'])->name('merchant.refunds.approve');
     Route::post('{refundId}/reject', [MerchantRefundController::class, 'reject'])->name('merchant.refunds.reject');
+});
+
+// --- Merchant: coupons ---
+Route::middleware('auth:sanctum')->prefix('merchant/coupons')->group(function () {
+    Route::get('/', [MerchantCouponController::class, 'index'])->name('merchant.coupons.index');
+    Route::post('/', [MerchantCouponController::class, 'store'])->name('merchant.coupons.store');
+    Route::put('{couponId}', [MerchantCouponController::class, 'update'])->name('merchant.coupons.update');
+    Route::delete('{couponId}', [MerchantCouponController::class, 'destroy'])->name('merchant.coupons.destroy');
 });

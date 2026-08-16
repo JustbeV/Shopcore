@@ -34,6 +34,8 @@ class InitiateCheckoutRequest extends FormRequest
             'billing_address.city' => ['required_with:billing_address', 'string'],
             'billing_address.postal_code' => ['required_with:billing_address', 'string'],
             'billing_address.country' => ['required_with:billing_address', 'string', 'size:2'],
+            'coupon_code' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'shipping_rate_id' => ['sometimes', 'nullable', 'string'],
         ];
     }
 

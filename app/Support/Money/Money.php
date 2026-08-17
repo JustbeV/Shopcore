@@ -4,65 +4,71 @@ namespace App\Support\Money;
 
 use InvalidArgumentException;
 
-readonly class Money
+final readonly class Money
 {
-    public function __construct(
-        public int $amountMinor,
-        public string $currency = 'USD'
+    private function __construct(
+        private int $amountMinor,
+        private string $currency,
     ) {}
 
-    public static function fromMajor(float|int $amount, string $currency = 'USD'): self
-    {
-        return new self((int) round($amount * 100), strtoupper($currency));
-    }
-
-    public static function fromMinor(int $amountMinor, string $currency = 'USD'): self
+    public static function fromMinorUnits(int $amountMinor, string $currency): self
     {
         return new self($amountMinor, strtoupper($currency));
     }
 
-    public function toMajor(): float
+    public static function zero(string $currency): self
     {
-        return $this->amountMinor / 100;
+        return new self(0, strtoupper($currency));
     }
 
-    public function add(self $other): self
+    public function amountMinor(): int
     {
-        $this->ensureSameCurrency($other);
+        return $this->amountMinor;
+    }
+
+    public function currency(): string
+    {
+        return $this->currency;
+    }
+
+    public function add(Money $other): self
+    {
+        $this->assertSameCurrency($other);
 
         return new self($this->amountMinor + $other->amountMinor, $this->currency);
     }
 
-    public function subtract(self $other): self
+    public function subtract(Money $other): self
     {
-        $this->ensureSameCurrency($other);
+        $this->assertSameCurrency($other);
 
         return new self($this->amountMinor - $other->amountMinor, $this->currency);
     }
 
-    public function multiply(float|int $multiplier): self
+    public function multiply(int $factor): self
     {
-        return new self((int) round($this->amountMinor * $multiplier), $this->currency);
+        return new self($this->amountMinor * $factor, $this->currency);
     }
 
+    public function isZero(): bool
+    {
+        return $this->amountMinor === 0;
+    }
+
+    /**
+     * Simple, locale-agnostic display formatting. Real currency-aware
+     * formatting (locale, symbol placement, zero-decimal currencies like
+     * JPY) is a Phase 8+ polish item — flagged rather than silently wrong.
+     */
     public function format(): string
     {
-        $symbols = [
-            'USD' => '$',
-            'EUR' => '€',
-            'GBP' => '£',
-            'PHP' => '₱',
-        ];
-
-        $symbol = $symbols[strtoupper($this->currency)] ?? $this->currency . ' ';
-
-        return $symbol . number_format($this->toMajor(), 2);
+        return sprintf('%s %s', $this->currency, number_format($this->amountMinor / 100, 2));
     }
 
-    private function ensureSameCurrency(self $other): void
+    private function assertSameCurrency(Money $other): void
     {
-        if (strtoupper($this->currency) !== strtoupper($other->currency)) {
-            throw new InvalidArgumentException("Cannot perform operation on different currencies ({$this->currency} vs {$other->currency}).");
+        if ($this->currency !== $other->currency) {
+            throw new InvalidArgumentException("Currency mismatch: {$this->currency} vs {$other->currency}");
         }
     }
 }

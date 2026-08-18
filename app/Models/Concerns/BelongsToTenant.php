@@ -9,13 +9,25 @@ trait BelongsToTenant
 {
     public static function bootBelongsToTenant(): void
     {
-        static::addGlobalScope(new TenantScope());
+        static::addGlobalScope(new TenantScope);
 
         static::creating(function ($model) {
-            $context = app(TenantContext::class);
-            if ($context->check() && ! $model->store_id) {
-                $model->store_id = $context->id();
+            if (! $model->store_id) {
+                $context = app(TenantContext::class);
+
+                if ($context->has()) {
+                    $model->store_id = $context->store->id;
+                }
+                // If no tenant is bound at create time either, store_id is
+                // left null and the DB's NOT NULL constraint on store_id
+                // (present on every tenant-owned table) catches it — same
+                // "fail loud" philosophy as TenantScope::apply().
             }
         });
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(\Modules\Tenant\Models\Store::class);
     }
 }

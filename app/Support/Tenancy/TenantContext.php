@@ -1,31 +1,42 @@
 <?php
-// This class holds the currently active store during any web request.
 
 namespace App\Support\Tenancy;
 
-use App\Models\Store;
+use Modules\Tenant\Models\Store;
+use RuntimeException;
 
 class TenantContext
 {
-    protected ?Store $tenant = null;
+    private ?Store $store = null;
 
-    public function set(?Store $tenant): void
+    public function set(Store $store): void
     {
-        $this->tenant = $tenant;
+        $this->store = $store;
     }
 
-    public function get(): ?Store
+    public function clear(): void
     {
-        return $this->tenant;
+        $this->store = null;
     }
 
-    public function id(): ?string
+    public function has(): bool
     {
-        return $this->tenant?->id;
+        return $this->store !== null;
     }
 
-    public function check(): bool
+    public function __get(string $name): mixed
     {
-        return $this->tenant !== null;
+        if ($name === 'store') {
+            if ($this->store === null) {
+                throw new RuntimeException(
+                    'No tenant is currently bound. HTTP requests must go through IdentifyTenant middleware; '.
+                    'console commands/queue workers must wrap tenant-scoped work in Tenancy::run($store, ...).'
+                );
+            }
+
+            return $this->store;
+        }
+
+        throw new RuntimeException("Undefined property [{$name}] on TenantContext.");
     }
 }
